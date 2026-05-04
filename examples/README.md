@@ -54,3 +54,26 @@ python examples/FinRL_StockTrading_2026_3_Backtest.py
 ```
 
 This script loads the trained agents, runs them on the trading data, and compares their performance against two baselines: Mean Variance Optimization (MVO) and the DJIA index. Results are printed to the console and a plot is saved as `backtest_result.png`.
+
+## FinRL XAU/USD Baseline
+
+These scripts provide a FinRL-first baseline for XAU research before adding a
+custom Forex environment or Transformer models.
+
+```bash
+python examples/FinRL_XAUUSD_1_data.py
+python examples/FinRL_XAUUSD_2_train.py --algo ppo --timesteps 20000
+python examples/FinRL_XAUUSD_3_backtest.py --algo ppo
+```
+
+Outputs are saved under:
+
+```text
+datasets/xauusd/
+trained_models/xauusd/
+results/xauusd/
+```
+
+Note: this first baseline uses FinRL's standard single-asset stock trading
+environment, so it models long/flat XAU exposure rather than full leveraged
+long/short Forex execution.
