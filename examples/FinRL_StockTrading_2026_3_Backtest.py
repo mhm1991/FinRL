@@ -152,18 +152,18 @@ MVO_result = pd.DataFrame(Portfolio_Assets, columns=["Mean Var"])
 
 import yfinance as yf
 
-df_dji = yf.download("^DJI", start=TRADE_START_DATE, end=TRADE_END_DATE)
-df_dji = df_dji[["Close"]].reset_index()
-df_dji.columns = ["date", "close"]
-df_dji["date"] = df_dji["date"].astype(str)
-fst_day = df_dji["close"].iloc[0]
-dji = pd.merge(
-    df_dji["date"],
-    df_dji["close"].div(fst_day).mul(1000000),
-    how="outer",
-    left_index=True,
-    right_index=True,
-).set_index("date")
+df_dji = yf.download(
+    "^DJI", start=TRADE_START_DATE, end=TRADE_END_DATE, auto_adjust=False, progress=False
+)
+dji = None
+if df_dji.empty:
+    print("\nWarning: DJIA benchmark download failed; continuing without DJIA.")
+else:
+    df_dji = df_dji[["Close"]].reset_index()
+    df_dji.columns = ["date", "close"]
+    df_dji["date"] = df_dji["date"].astype(str)
+    fst_day = df_dji["close"].iloc[0]
+    dji = df_dji.set_index("date")["close"].div(fst_day).mul(1000000)
 
 # %% Part 6. Compare results
 
@@ -193,20 +193,27 @@ df_result_sac = (
     else None
 )
 
-result = pd.DataFrame(
-    {
-        "a2c": df_result_a2c["account_value"] if if_using_a2c else None,
-        "ddpg": df_result_ddpg["account_value"] if if_using_ddpg else None,
-        "ppo": df_result_ppo["account_value"] if if_using_ppo else None,
-        "td3": df_result_td3["account_value"] if if_using_td3 else None,
-        "sac": df_result_sac["account_value"] if if_using_sac else None,
-        "mvo": MVO_result["Mean Var"],
-        "dji": dji["close"],
-    }
-)
+result_series = {}
+if if_using_a2c:
+    result_series["a2c"] = df_result_a2c["account_value"]
+if if_using_ddpg:
+    result_series["ddpg"] = df_result_ddpg["account_value"]
+if if_using_ppo:
+    result_series["ppo"] = df_result_ppo["account_value"]
+if if_using_td3:
+    result_series["td3"] = df_result_td3["account_value"]
+if if_using_sac:
+    result_series["sac"] = df_result_sac["account_value"]
+result_series["mvo"] = MVO_result["Mean Var"]
+if dji is not None:
+    result_series["dji"] = dji
+
+result = pd.concat(result_series, axis=1, join="inner").dropna()
 
 print("\n=== Backtest Results ===")
 print(result)
+result.to_csv("backtest_result.csv")
+print("\nResult data saved to backtest_result.csv")
 
 # %% Part 7. Plot
 
