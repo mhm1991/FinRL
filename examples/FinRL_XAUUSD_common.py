@@ -268,3 +268,92 @@ def summarize_long_only_trades(
             }
         ]
     )
+
+
+def simulate_position_strategy(
+    prices: pd.Series,
+    positions: pd.Series,
+    *,
+    initial_amount: float,
+    cost_pct: float,
+) -> pd.Series:
+    prices = prices.astype(float)
+    positions = positions.reindex(prices.index).fillna(0).clip(0, 1)
+    returns = prices.pct_change().fillna(0)
+    previous_position = positions.shift(1).fillna(0)
+    turnover_cost = positions.diff().abs().fillna(positions.abs()) * cost_pct
+    strategy_returns = previous_position * returns - turnover_cost
+    return initial_amount * (1 + strategy_returns).cumprod()
+
+
+def build_rule_based_baselines(
+    trade: pd.DataFrame,
+    *,
+    initial_amount: float,
+    cost_pct: float,
+    seed: int,
+) -> pd.DataFrame:
+    prices = trade[["date", "close"]].drop_duplicates("date").set_index("date")["close"]
+    returns = prices.pct_change()
+
+    sma_fast = prices.rolling(20, min_periods=1).mean()
+    sma_slow = prices.rolling(50, min_periods=1).mean()
+    sma_position = (sma_fast > sma_slow).astype(int)
+
+    delta = prices.diff()
+    gains = delta.clip(lower=0).rolling(14, min_periods=1).mean()
+    losses = (-delta.clip(upper=0)).rolling(14, min_periods=1).mean()
+    rs = gains / losses.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    rsi_position = (rsi < 30).astype(int)
+    rsi_position[rsi > 70] = 0
+    rsi_position = rsi_position.ffill().fillna(0)
+
+    ema_fast = prices.ewm(span=12, adjust=False).mean()
+    ema_slow = prices.ewm(span=26, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    macd_signal = macd.ewm(span=9, adjust=False).mean()
+    macd_position = (macd > macd_signal).astype(int)
+
+    breakout_high = prices.rolling(20, min_periods=1).max().shift(1)
+    breakout_low = prices.rolling(10, min_periods=1).min().shift(1)
+    breakout_position = pd.Series(0, index=prices.index, dtype=float)
+    breakout_position[prices > breakout_high] = 1
+    breakout_position[prices < breakout_low] = 0
+    breakout_position = breakout_position.replace(0, np.nan).ffill().fillna(0)
+
+    rolling_mean = prices.rolling(20, min_periods=1).mean()
+    rolling_std = prices.rolling(20, min_periods=1).std().replace(0, np.nan)
+    zscore = (prices - rolling_mean) / rolling_std
+    mean_reversion_position = (zscore < -1).astype(int)
+    mean_reversion_position[zscore > 0] = 0
+    mean_reversion_position = mean_reversion_position.ffill().fillna(0)
+
+    rng = np.random.default_rng(seed)
+    random_position = pd.Series(
+        rng.integers(0, 2, size=len(prices)),
+        index=prices.index,
+        dtype=float,
+    )
+
+    always_flat_position = pd.Series(0, index=prices.index, dtype=float)
+
+    baselines = {
+        "sma_crossover": sma_position,
+        "rsi_strategy": rsi_position,
+        "macd_strategy": macd_position,
+        "breakout_strategy": breakout_position,
+        "mean_reversion": mean_reversion_position,
+        "random_policy": random_position,
+        "always_flat": always_flat_position,
+    }
+    curves = {
+        name: simulate_position_strategy(
+            prices,
+            position,
+            initial_amount=initial_amount,
+            cost_pct=cost_pct,
+        ).rename(name)
+        for name, position in baselines.items()
+    }
+    return pd.DataFrame(curves)

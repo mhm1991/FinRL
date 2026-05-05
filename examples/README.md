@@ -95,6 +95,12 @@ For walk-forward validation:
 python examples/FinRL_XAUUSD_4_walkforward.py --algo ppo --timesteps 20000
 ```
 
+For rule-based baseline comparison:
+
+```bash
+python examples/FinRL_XAUUSD_5_baselines.py
+```
+
 For longer PPO rollouts:
 
 ```bash
