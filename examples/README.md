@@ -66,6 +66,12 @@ python examples/FinRL_XAUUSD_2_train.py --algo ppo --timesteps 20000
 python examples/FinRL_XAUUSD_3_backtest.py --algo ppo
 ```
 
+To use broker/exported XAU/USD data instead of Yahoo:
+
+```bash
+python examples/FinRL_XAUUSD_1_data.py --csv data/xauusd_m15.csv
+```
+
 Outputs are saved under:
 
 ```text

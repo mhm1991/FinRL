@@ -33,6 +33,16 @@ Prepare data:
 python examples/FinRL_XAUUSD_1_data.py
 ```
 
+Prepare data from a local broker/exported CSV:
+
+```bash
+python examples/FinRL_XAUUSD_1_data.py --csv data/xauusd_m15.csv
+```
+
+The CSV importer accepts common date/time aliases such as `date`, `datetime`,
+`time`, or `timestamp`; OHLC columns such as `open`, `high`, `low`, `close`;
+and optional volume columns such as `volume`, `tick_volume`, or `ticks`.
+
 Train PPO:
 
 ```bash
