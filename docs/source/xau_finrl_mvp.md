@@ -13,6 +13,9 @@ Forex execution logic or Transformer-based models.
 - Baseline: buy-and-hold XAU exposure.
 - Outputs: trained models, backtest equity curves, action logs, and summary
   metrics.
+- Features: FinRL technical indicators plus XAU-specific lagged returns,
+  rolling volatility, ATR, candle range/body ratios, moving-average ratios, and
+  time/session signals.
 
 ## Important Limitation
 
@@ -53,6 +56,15 @@ Backtest PPO:
 
 ```bash
 python examples/FinRL_XAUUSD_3_backtest.py --algo ppo
+```
+
+Backtests save equity metrics, daily win rate, action logs, and trade-level
+metrics under `results/xauusd/`.
+
+Run walk-forward validation:
+
+```bash
+python examples/FinRL_XAUUSD_4_walkforward.py --algo ppo --timesteps 20000
 ```
 
 Train and compare all supported agents:

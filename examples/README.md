@@ -83,3 +83,14 @@ results/xauusd/
 Note: this first baseline uses FinRL's standard single-asset stock trading
 environment, so it models long/flat XAU exposure rather than full leveraged
 long/short Forex execution.
+
+The XAU data step adds extra market-context features such as lagged returns,
+rolling volatility, ATR, candle range/body ratios, moving-average ratios, and
+time/session signals. Backtests save both daily equity metrics and trade-level
+metrics under `results/xauusd/`.
+
+For walk-forward validation:
+
+```bash
+python examples/FinRL_XAUUSD_4_walkforward.py --algo ppo --timesteps 20000
+```

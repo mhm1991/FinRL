@@ -18,9 +18,10 @@ from finrl.meta.preprocessor.preprocessors import FeatureEngineer
 from finrl.meta.preprocessor.yahoodownloader import YahooDownloader
 
 from FinRL_XAUUSD_common import DATA_DIR
+from FinRL_XAUUSD_common import BASE_TECH_INDICATORS
 from FinRL_XAUUSD_common import DEFAULT_TICKER
 from FinRL_XAUUSD_common import FALLBACK_TICKERS
-from FinRL_XAUUSD_common import TECH_INDICATORS
+from FinRL_XAUUSD_common import add_xau_market_features
 from FinRL_XAUUSD_common import ensure_xau_dirs
 
 
@@ -141,12 +142,13 @@ def main() -> None:
 
     fe = FeatureEngineer(
         use_technical_indicator=True,
-        tech_indicator_list=TECH_INDICATORS,
+        tech_indicator_list=BASE_TECH_INDICATORS,
         use_vix=False,
         use_turbulence=False,
         user_defined_feature=False,
     )
     processed = fe.preprocess_data(raw)
+    processed = add_xau_market_features(processed)
     processed = processed.sort_values(["date", "tic"]).ffill().bfill()
 
     train = data_split(processed, args.train_start, args.train_end)

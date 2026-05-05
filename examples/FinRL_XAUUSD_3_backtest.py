@@ -27,9 +27,12 @@ from FinRL_XAUUSD_common import DATA_DIR
 from FinRL_XAUUSD_common import MODEL_DIR
 from FinRL_XAUUSD_common import RESULTS_DIR
 from FinRL_XAUUSD_common import build_env_kwargs
+from FinRL_XAUUSD_common import buy_and_hold_baseline
 from FinRL_XAUUSD_common import ensure_xau_dirs
 from FinRL_XAUUSD_common import load_split
 from FinRL_XAUUSD_common import parse_algorithms
+from FinRL_XAUUSD_common import summarize_equity_curves
+from FinRL_XAUUSD_common import summarize_long_only_trades
 
 MODEL_CLASSES = {
     "a2c": A2C,
@@ -51,37 +54,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def buy_and_hold_baseline(trade: pd.DataFrame, initial_amount: float) -> pd.Series:
-    prices = trade[["date", "close"]].drop_duplicates("date").set_index("date")["close"]
-    return prices.div(prices.iloc[0]).mul(initial_amount).rename("buy_hold")
-
-
-def max_drawdown(values: pd.Series) -> float:
-    drawdown = values.div(values.cummax()).sub(1.0)
-    return float(drawdown.min())
-
-
-def summarize_results(result: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for name in result.columns:
-        series = result[name].dropna()
-        returns = series.pct_change().dropna()
-        sharpe = 0.0
-        if returns.std() != 0:
-            sharpe = float((252**0.5) * returns.mean() / returns.std())
-        rows.append(
-            {
-                "strategy": name,
-                "start_value": float(series.iloc[0]),
-                "end_value": float(series.iloc[-1]),
-                "total_return": float(series.iloc[-1] / series.iloc[0] - 1.0),
-                "max_drawdown": max_drawdown(series),
-                "sharpe": sharpe,
-            }
-        )
-    return pd.DataFrame(rows).set_index("strategy")
-
-
 def main() -> None:
     args = parse_args()
     ensure_xau_dirs()
@@ -96,6 +68,7 @@ def main() -> None:
     )
 
     result_series = {"buy_hold": buy_and_hold_baseline(trade, args.initial_amount)}
+    trade_metric_frames = []
 
     for algo in parse_algorithms(args.algo):
         model_path = MODEL_DIR / f"agent_{algo}"
@@ -110,12 +83,26 @@ def main() -> None:
         account_series = account_value.set_index("date")["account_value"].rename(algo)
         result_series[algo] = account_series
         actions.to_csv(RESULTS_DIR / f"actions_{algo}.csv")
+        trade_metrics = summarize_long_only_trades(
+            trade,
+            actions,
+            cost_pct=args.cost_pct,
+        )
+        trade_metrics.insert(0, "strategy", algo)
+        trade_metric_frames.append(trade_metrics)
 
     result = pd.concat(result_series.values(), axis=1, join="inner").dropna()
-    metrics = summarize_results(result)
+    metrics = summarize_equity_curves(result)
+    trade_metrics = (
+        pd.concat(trade_metric_frames, ignore_index=True).set_index("strategy")
+        if trade_metric_frames
+        else pd.DataFrame()
+    )
 
     result.to_csv(RESULTS_DIR / "backtest_result.csv")
     metrics.to_csv(RESULTS_DIR / "backtest_metrics.csv")
+    if not trade_metrics.empty:
+        trade_metrics.to_csv(RESULTS_DIR / "trade_metrics.csv")
 
     plt.rcParams["figure.figsize"] = (15, 5)
     result.plot()
@@ -127,6 +114,9 @@ def main() -> None:
 
     print("\n=== Backtest Metrics ===")
     print(metrics)
+    if not trade_metrics.empty:
+        print("\n=== Trade Metrics ===")
+        print(trade_metrics)
     print(f"\nSaved outputs under {RESULTS_DIR}")
 
 
