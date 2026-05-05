@@ -52,6 +52,12 @@ Train PPO:
 python examples/FinRL_XAUUSD_2_train.py --algo ppo --timesteps 20000
 ```
 
+Use a longer PPO rollout for more serious experiments:
+
+```bash
+python examples/FinRL_XAUUSD_2_train.py --algo ppo --timesteps 100000 --ppo-n-steps 4096
+```
+
 Backtest PPO:
 
 ```bash
@@ -65,6 +71,12 @@ Run walk-forward validation:
 
 ```bash
 python examples/FinRL_XAUUSD_4_walkforward.py --algo ppo --timesteps 20000
+```
+
+Walk-forward supports the same PPO rollout controls:
+
+```bash
+python examples/FinRL_XAUUSD_4_walkforward.py --algo ppo --timesteps 100000 --ppo-n-steps 4096
 ```
 
 Train and compare all supported agents:

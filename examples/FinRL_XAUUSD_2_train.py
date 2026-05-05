@@ -25,7 +25,7 @@ from FinRL_XAUUSD_common import parse_algorithms
 
 MODEL_PARAMS = {
     "ppo": {
-        "n_steps": 1024,
+        "n_steps": 2048,
         "ent_coef": 0.01,
         "learning_rate": 0.00025,
         "batch_size": 128,
@@ -55,10 +55,35 @@ MODEL_PARAMS = {
 }
 
 
+def build_model_params(
+    algo: str,
+    *,
+    ppo_n_steps: int,
+    ppo_batch_size: int,
+) -> dict:
+    params = MODEL_PARAMS[algo].copy()
+    if algo == "ppo":
+        params["n_steps"] = ppo_n_steps
+        params["batch_size"] = ppo_batch_size
+    return params
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train FinRL agents for XAU.")
     parser.add_argument("--algo", default="ppo", help="ppo, sac, td3, ddpg, a2c, or all")
     parser.add_argument("--timesteps", type=int, default=20000)
+    parser.add_argument(
+        "--ppo-n-steps",
+        type=int,
+        default=2048,
+        help="PPO rollout length before each update.",
+    )
+    parser.add_argument(
+        "--ppo-batch-size",
+        type=int,
+        default=128,
+        help="PPO minibatch size. Should divide --ppo-n-steps for one-env training.",
+    )
     parser.add_argument("--initial-amount", type=float, default=100000.0)
     parser.add_argument("--hmax", type=int, default=100)
     parser.add_argument("--cost-pct", type=float, default=0.0002)
@@ -89,8 +114,19 @@ def main() -> None:
     env_train, _ = train_env.get_sb_env()
 
     for algo in parse_algorithms(args.algo):
+        model_params = build_model_params(
+            algo,
+            ppo_n_steps=args.ppo_n_steps,
+            ppo_batch_size=args.ppo_batch_size,
+        )
+        if algo == "ppo" and args.timesteps < model_params["n_steps"]:
+            print(
+                "Warning: --timesteps is lower than PPO --ppo-n-steps; "
+                f"Stable-Baselines3 will still collect one full "
+                f"{model_params['n_steps']}-step rollout."
+            )
         agent = DRLAgent(env=env_train)
-        model = agent.get_model(algo, model_kwargs=MODEL_PARAMS[algo])
+        model = agent.get_model(algo, model_kwargs=model_params)
         model.set_logger(
             configure(str(RESULTS_DIR / algo), ["stdout", "csv", "tensorboard"])
         )

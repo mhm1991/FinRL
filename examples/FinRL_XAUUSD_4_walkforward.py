@@ -17,7 +17,7 @@ from finrl.agents.stablebaselines3.models import DRLAgent
 from finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
 from finrl.meta.preprocessor.preprocessors import data_split
 
-from FinRL_XAUUSD_2_train import MODEL_PARAMS
+from FinRL_XAUUSD_2_train import build_model_params
 from FinRL_XAUUSD_3_backtest import MODEL_CLASSES
 from FinRL_XAUUSD_common import DATA_DIR
 from FinRL_XAUUSD_common import MODEL_DIR
@@ -34,6 +34,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run walk-forward XAU validation.")
     parser.add_argument("--algo", default="ppo", help="ppo, sac, td3, ddpg, a2c, or all")
     parser.add_argument("--timesteps", type=int, default=20000)
+    parser.add_argument(
+        "--ppo-n-steps",
+        type=int,
+        default=2048,
+        help="PPO rollout length before each update.",
+    )
+    parser.add_argument(
+        "--ppo-batch-size",
+        type=int,
+        default=128,
+        help="PPO minibatch size. Should divide --ppo-n-steps for one-env training.",
+    )
     parser.add_argument("--train-years", type=int, default=5)
     parser.add_argument("--test-months", type=int, default=12)
     parser.add_argument("--step-months", type=int, default=12)
@@ -116,8 +128,19 @@ def main() -> None:
         env_train, _ = train_env.get_sb_env()
 
         for algo in parse_algorithms(args.algo):
+            model_params = build_model_params(
+                algo,
+                ppo_n_steps=args.ppo_n_steps,
+                ppo_batch_size=args.ppo_batch_size,
+            )
+            if algo == "ppo" and args.timesteps < model_params["n_steps"]:
+                print(
+                    "Warning: --timesteps is lower than PPO --ppo-n-steps; "
+                    f"Stable-Baselines3 will still collect one full "
+                    f"{model_params['n_steps']}-step rollout."
+                )
             agent = DRLAgent(env=env_train)
-            model = agent.get_model(algo, model_kwargs=MODEL_PARAMS[algo])
+            model = agent.get_model(algo, model_kwargs=model_params)
             model.set_logger(
                 configure(
                     str(walkforward_result_dir / fold_name / algo),
